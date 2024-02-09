@@ -1,9 +1,10 @@
+
 //按钮60s倒计时
-const useCountDown = (obj: any, timer: any):{setItem:Function,removeItem:Function} => {
+const useCountDown = (): { setItem: Function, removeItem: Function } => {
   let map = new Map();
   return {
-    setItem(obj: any, timer: any) {
-      timer = timer || 60;  //倒计时60s    默认60秒，也可自定义传值
+        //倒计时    默认60秒，也可自定义传值
+    setItem(obj: any, timer: number = 60) {
       obj.disabled = true;               //按钮变为不可用
       let auth_timer = setInterval(() => {  //定时器设置每秒递减
         map.set(obj, auth_timer);

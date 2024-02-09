@@ -16,7 +16,7 @@
           <el-input v-model="userForm.checkCode" :disabled="codeRight" autocomplete="off" placeholder="邮箱验证码"
             prefix-icon="el-icon-link"></el-input>
           <el-button plain style="position: absolute;right: 0; width: 40%;top: 0;" v-preventReClick
-            @click="sendEmailCode(userFormImpl, $event)">发送验证码
+            @click="sendEmailCode( $event)">发送验证码
           </el-button>
         </el-form-item>
         <el-form-item prop="passWord">
@@ -28,7 +28,8 @@
             autocomplete="off" placeholder="请再次输入密码" prefix-icon="el-icon-lock"></el-input>
         </el-form-item>
         <el-form-item>
-          <el-button type="primary" class="submit" v-preventReClick @click="submitForm(userFormImpl)">找回密码</el-button>
+          <el-button type="primary" class="submit" v-preventReClick
+            @click="submitForm()">找回密码</el-button>
         </el-form-item>
       </el-form>
     </div>
@@ -36,11 +37,17 @@
 </template>
 
 <script  setup lang="ts" name="Register_Form">
-import { reactive, ref ,getCurrentInstance} from 'vue'
-import {ElMessage} from 'element-plus';
+import { reactive, ref, getCurrentInstance } from 'vue'
+import { ElMessage } from 'element-plus';
 import type { FormInstance, FormRules } from 'element-plus'
-
 import { useRouter } from 'vue-router'
+// 引入倒计时
+import useCountDown from '@/utils/useCountDown'
+
+// 引入二次axios
+import request from '@/api/request'
+
+// 引入工具类
 import utils from "@/utils/useTools";
 
 
@@ -48,7 +55,11 @@ const router = useRouter()
 
 const userFormImpl = ref<FormInstance>()
 
-const internalInstance  = getCurrentInstance() as any
+const countDown = useCountDown()
+
+const http = request
+
+const internalInstance = getCurrentInstance() as any
 
 // 验证码错误信息
 let checkCodeErrorMessage = ref(null)
@@ -85,7 +96,7 @@ const CheckEmail = (rule: any, value: string, callback: Function) => {
 }
 
 // 验证码自定义验证规则
-const CheckCode = async (rule :any, value:any, callback:any) => {
+const CheckCode = async (rule: any, value: any, callback: any) => {
   if (value === '') {
     callback(new Error('请输入验证码'));
   }
@@ -109,7 +120,7 @@ const CheckPass = (rule: any, value: any, callback: any) => {
 }
 
 //再次输入密码验证规则
-let CheckPass2 = (rule:any, value:any, callback:any) => {
+let CheckPass2 = (rule: any, value: any, callback: any) => {
 
   if (value === '') {
     callback(new Error('请再次输入密码'));
@@ -121,7 +132,7 @@ let CheckPass2 = (rule:any, value:any, callback:any) => {
 }
 
 //表单的验证规则
-let rules = reactive < FormRules < typeof userForm >> ({
+let rules = reactive<FormRules<typeof userForm>>({
   userAccount: [
     { validator: CheckEmail, trigger: 'blur' }
   ],
@@ -136,51 +147,43 @@ let rules = reactive < FormRules < typeof userForm >> ({
   ],
 })
 
-const submitForm = (formEl: FormInstance |undefined)=> {
-  if (!formEl) return
-  formEl.validate((valid) => {
-    if (valid) {
-      internalInstance.$http.post("/allow/resetpwd?account=" + userForm.userAccount + "&password=" + userForm.passWord).then((res:any) => {
-        if (res.data.code === 200) {
-          debugger;
-          //清除发送验证码按钮倒计时的定时器
-          internalInstance  .$countDown.removeItem(codeButtonTemp);
-          ElMessage.success({ message: res.data.message, showClose: true, duration: 1500 });
-          internalInstance.$http.post("/allow/sendHtmlResetPwd?email=" + userForm.userAccount + "&password=" + userForm.passWord);
-          router.push('/loginForm');
-        } else {
-          //验证码已过期，返回code 500
-          ElMessage.warning({ message: res.data.message, showClose: true, duration: 1500 });
-        }
-      }).catch((err: string) => {  //网络等原因，导致发送失败
-        ElMessage.error({ message: '密码重置失败，' + err, showClose: true, duration: 1500 });
-      })
-    } else {
-      return false;
-    }
-  })
+const submitForm = async () => {
+  await userFormImpl.value?.validate()
+  let res = await http.post("/allow/resetpwd?account=" + userForm.userAccount + "&password=" + userForm.passWord)
+  if (res.data.code === 200) {
+    debugger;
+    //清除发送验证码按钮倒计时的定时器
+    countDown.removeItem(codeButtonTemp);
+    ElMessage.success({ message: res.data.message, showClose: true, duration: 1500 });
+    http.post("/allow/sendHtmlResetPwd?email=" + userForm.userAccount + "&password=" + userForm.passWord);
+    router.push('/loginForm');
+  } else {
+    //验证码已过期，返回code 500
+    ElMessage.warning({ message: res.data.message, showClose: true, duration: 1500 });
+  }
+
 }
 
 
 //发送邮件验证码
-const sendEmailCode=(formEl: FormInstance | undefined, event: { currentTarget: any; }) =>{
+const sendEmailCode = async( event: { currentTarget: any; }) => {
   codeButtonTemp = event.currentTarget;
-  let va = true;
-  formEl?.validateField('userAccount', (valid) => {
-    va = `${valid}` === "";
+  let val = true;
+  userFormImpl.value?.validateField('userAccount', (valid) => {
+    val = `${valid}` === "";
   })
-  if (va) {
+  if (val) {
     let loading = internalInstance.$loading({ lock: true, text: "验证码发送中", background: "rgba(255,255,255,0.1)" });
-    internalInstance.$http.post("/allow/sendHtmlCode?email=" + userForm.userAccount).then((res: any) => {
+    try {
+      await http.post("/allow/sendHtmlCode?email=" + userForm.userAccount)
       loading.close();
       codeRight.value = false;
       internalInstance.$countDown.setItem(codeButtonTemp);
       ElMessage.success("验证码发送成功");
-    }).catch((err: { message: any; }) => {
-      checkCodeErrorMessage.value = err.message;
-      checkCodeErrorMessage.value = null;
+    } catch (error:any) {
+      checkCodeErrorMessage.value = error.message;
       loading.close();
-    })
+    }
   }
 }
 

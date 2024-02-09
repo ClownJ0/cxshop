@@ -1,81 +1,23 @@
 import axios from "axios";
 import type { AxiosRequestConfig, AxiosResponse } from "axios";
-import { defineStore } from "pinia";
+import { useUserStore } from "@/stores/userStore";
 
-const axiosStore = defineStore("axios", () => {
-    
 
-}
-
-)
+let userStore = useUserStore();
 
 const axiosInstance = axios.create({
-    baseURL: "http://localhost:3000/",
+    baseURL: "http://localhost:8080/",
     timeout: 5000,
 });
 axiosInstance.interceptors.request.use(
     config => {
-        if (store.state.token) {
-            config.headers.token = store.state.token
+        if (userStore.userINfo.token) {
+            config.headers.token = userStore.userINfo.token;
         }
         return config;
     }
 )
 
-interface Data {
-    [index: string]: unknown;
-}
-interface Http {
-    get(
-        url: string,
-        data: Data,
-        config?: AxiosRequestConfig
-    ): Promise<AxiosResponse>;
-    post(
-        url: string,
-        data: Data,
-        config?: AxiosRequestConfig
-    ): Promise<AxiosResponse>;
-    put(
-        url: string,
-        data: Data,
-        config?: AxiosRequestConfig
-    ): Promise<AxiosResponse>;
-    patch(
-        url: string,
-        data: Data,
-        config?: AxiosRequestConfig
-    ): Promise<AxiosResponse>;
-    delete(
-        url: string,
-        data: Data,
-        config?: AxiosRequestConfig
-    ): Promise<AxiosResponse>;
-}
-
-const http: Http = {
-    get(url, data, config) {
-        return axiosInstance.get(url, {
-            params: data,
-            ...config,
-        });
-    },
-    post(url: string, data: any, config: AxiosRequestConfig<any> | undefined) {
-        return axiosInstance.post(url, data, config);
-    },
-    put(url, data, config) {
-        return axiosInstance.put(url, data, config);
-    },
-    patch(url, data, config) {
-        return axiosInstance.patch(url, data, config);
-    },
-    delete(url, data, config) {
-        return axiosInstance.delete(url, {
-            data,
-            ...config,
-        });
-    },
-}
 axiosInstance.interceptors.response.use(
     (response): any => {
         const res = response.data;
@@ -87,4 +29,4 @@ axiosInstance.interceptors.response.use(
         return Promise.reject(error);
     }
 );
-export default http;
+export default axiosInstance;
